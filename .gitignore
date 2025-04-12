@@ -1,0 +1,5 @@
+/.venv
+/.vscode
+/installed_packages.txt
+/Oracle_JDK-23
+/test.py
