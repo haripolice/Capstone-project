@@ -1,48 +1,31 @@
-import mysql.connector
 import pandas as pd
+import os
 
-# TiDB Connection
-connection = mysql.connector.connect(
-    host="gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
-    port=4000,
-    user="3wKrzSV6FDpedz7.root",
-    password="UU1J4UQ08VQ0aZnT",
-    database="guvi"
-)
-cursor = connection.cursor()
-
-# Create "IMBD" Table if it doesn't exist
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS IMBD (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    movie_name VARCHAR(255),    
-    genre VARCHAR(100),
-    ratings FLOAT,
-    voting_counts INT,
-    duration INT
-);
-""")
-connection.commit()
-
-# Load the IMDb 2024 dataset
-df = pd.read_csv("IMDb_2024_Movies.csv")
-
-# Convert NaN values to None for SQL insertion
-df = df.where(pd.notnull(df), None)
-
-# Insert data into TiDB "IMBD" table
-for _, row in df.iterrows():
-    sql = """
-    INSERT INTO IMBD (movie_name, genre, ratings, voting_counts, duration)
-    VALUES (%s, %s, %s, %s, %s)
-    """
-    values = (row["Movie Name"], row["Genre"], row["Ratings"], row["Voting Counts"], row["Duration"])
-    
-    cursor.execute(sql, values)
-
-# Commit changes and close connection
-connection.commit()
-cursor.close()
-connection.close()
-
-print("✅ Data successfully stored in TiDB 'IMBD' table!")
+folder_path = "OneDrive_1_3-18-2025"
+output_file_name = "combined_data.xlsx" 
+all_data = []
+all_files = os.listdir(folder_path)
+ 
+for file in all_files:
+    if file.endswith((".csv", ".xlsx")):  
+        file_path = os.path.join(folder_path, file)
+        try:
+            if file.endswith(".csv"):
+                df = pd.read_csv(file_path)  
+            elif file.endswith(".xlsx"):
+                df = pd.read_excel(file_path)  
+ 
+            df['Source File'] = file
+            all_data.append(df)
+        except Exception as e:
+            print(f"Error reading file: {file} - {e}")
+ 
+if all_data:
+    combined_df = pd.concat(all_data, ignore_index=True)
+    try:
+        combined_df.to_excel(output_file_name, index=False)
+        print(f"Successfully combined data from all CSV and Excel files into '{output_file_name}'") 
+    except Exception as e:
+        print(f"Error writing to the output file: {e}")
+else:
+    print("No CSV or Excel files found in the specified folder.")

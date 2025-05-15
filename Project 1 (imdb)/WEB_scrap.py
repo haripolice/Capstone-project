@@ -1,68 +1,112 @@
+# Action movies 
+
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import pandas as pd
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 import time
 
-# IMDb 2024 Movies URL
-URL = "https://www.imdb.com/search/title/?title_type=feature&release_date=2024-01-01,2024-12-31"
+# Initialize WebDriver
+driver = webdriver.Chrome()
+driver.get("https://www.imdb.com/search/title/?title_type=feature&genres=action&release_date=2024-01-01,2024-12-31")
 
-# Correct ChromeDriver path
-chrome_driver_path = r"C:\Users\KRHA1002\OneDrive - Nielsen IQ\Profile\GUVI\chrome-win64\chromedriver-win64\chromedriver.exe"
+time.sleep(3)  # Waiting for the page to load
 
-# Set up Selenium WebDriver with user-agent
-service = Service(chrome_driver_path)
-options = webdriver.ChromeOptions()
-options.add_argument("--ignore-certificate-errors")
-options.add_argument("--disable-blink-features=AutomationControlled")  # Prevent detection
-options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+genre = "Action"
 
-driver = webdriver.Chrome(service=service, options=options)
+# Scroll Until No More New Data Loads
+scrolling = True
+movies_per_page = 50  # Assuming each load gives 50 movies
+total_movies_needed = 500
+current_movies = 0
 
-# Open IMDb page
-driver.get(URL)
-time.sleep(10)  # Increase wait time
-
-# Wait for movies to load
-WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, "//div[contains(@class, 'lister-item')]")))
-
-# Scraping movie details
-movies = driver.find_elements(By.XPATH, "//div[contains(@class, 'lister-item')]")
-print(f"Movies found: {len(movies)}")  # Debugging: Check if movies are found
-
-movie_list = []
-for movie in movies:
-    try:
-        name = movie.find_element(By.TAG_NAME, "h3").text
-    except:
-        name = "Unknown"
-    try:
-        genre = movie.find_element(By.CLASS_NAME, "genre").text.strip()
-    except:
-        genre = "Unknown"
-    try:
-        rating = movie.find_element(By.CLASS_NAME, "ratings-imdb-rating").text
-    except:
-        rating = None
-    try:
-        votes = movie.find_element(By.XPATH, ".//span[@name='nv']").text.replace(",", "")
-    except:
-        votes = None
-    try:
-        duration = movie.find_element(By.CLASS_NAME, "runtime").text.replace(" min", "")
-    except:
-        duration = None
+while scrolling and current_movies < total_movies_needed:
+    old_page_source = driver.page_source  # Save old page source
     
-    movie_list.append([name, genre, rating, votes, duration])
+    # Scroll down to load more data
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)  # Allow time for new data to load
+    
+    new_page_source = driver.page_source  # Save new page source
 
-# Close the browser
+    if new_page_source == old_page_source:
+        try:
+            # Locate and click the "See More" button if present
+            see_more_button = driver.find_element(By.XPATH, "//span[contains(@class, 'ipc-see-more')]")
+            ActionChains(driver).move_to_element(see_more_button).click().perform()
+            time.sleep(2)  # Wait for new content to load
+        except Exception:
+            scrolling = False  # Stop scrolling if button isn't found
+    else:
+        current_movies += movies_per_page  # Increment count
+
+# Extract movie containers
+movie_blocks = driver.find_elements(By.CSS_SELECTOR, "li.ipc-metadata-list-summary-item")
+
+movies_list = []
+
+for movie in movie_blocks:
+    try:
+        title = movie.find_element(By.CSS_SELECTOR, "h3.ipc-title__text").text.strip()
+    except:
+        title = "N/A"
+
+    try:
+        duration_element = movie.find_element(By.XPATH, ".//span[contains(@class, 'dli-title-metadata-item') and (contains(text(),'h') or contains(text(),'m'))]")
+        duration = duration_element.text.strip() if duration_element.text.strip() else "N/A"
+    except:
+        duration = "N/A"
+
+    try:
+        rating = movie.find_element(By.CSS_SELECTOR, "span.ipc-rating-star--rating").text.strip()
+    except:
+        rating = "N/A"
+
+    try:
+        voting = movie.find_element(By.CSS_SELECTOR, "span.ipc-rating-star--voteCount").text.strip()
+    except:
+        voting = "N/A"
+
+    movie_data = {
+        "Title": title,
+        "Genre": genre,
+        "Duration": duration,
+        "Rating": rating,
+        "Voting": voting,
+    }
+    movies_list.append(movie_data)
+
+# Print results
+for movie in movies_list:
+    print(movie)
+
+# Close the driver
 driver.quit()
 
-# Convert to DataFrame
-df = pd.DataFrame(movie_list, columns=["Movie Name", "Genre", "Ratings", "Voting Counts", "Duration"])
+#common csv converting code
 
-# Save CSV
-df.to_csv("IMDb_2024_Movies.csv", index=False, encoding="utf-8-sig")
-print("✅ Data Scraped and Saved!")
+import pandas as pd
+
+
+df=pd.DataFrame(movies_list)
+# Cleaning Steps:
+# 1. Remove leading numbers from "Title"
+df["Title"] = df["Title"].str.replace(r"^\d+\.\s*", "", regex=True)
+
+# 2. Remove parentheses from "Voting"
+df["Voting"] = df["Voting"].str.replace(r"[()]", "", regex=True)
+
+# 3. Reset index to start from 1
+df.index = df.index + 1
+
+df.to_csv(r"action.csv", index=False, encoding="utf-8")
+print("CSV file saved successfully in D:\\Guvi Ds!")
+
+
+*
+*
+*
+
+
+# Comedy movies
+from selenium import webdriver
